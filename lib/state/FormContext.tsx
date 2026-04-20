@@ -70,9 +70,10 @@ export function FormProvider({ children }: { children: ReactNode }) {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
     saveTimeoutRef.current = setTimeout(async () => {
-      setState(prev => ({ ...prev, isSyncing: true }));
+      // Don't mark isSyncing if we've already unmounted or session changed
+      setState(prev => prev.session?.token === state.session?.token ? { ...prev, isSyncing: true } : prev);
       
-      const updatedSession: GringaSession = {
+      const sessionToSave: GringaSession = {
         ...state.session!,
         answers: state.answers,
         currentStepIndex: state.currentStepIndex,
@@ -80,10 +81,15 @@ export function FormProvider({ children }: { children: ReactNode }) {
       };
 
       try {
-        await saveSession(updatedSession);
-        // Note: We don't necessarily need to update state.session here 
-        // to avoid infinite loops, but we should mark sync as done
-        setState(prev => ({ ...prev, isSyncing: false, session: updatedSession }));
+        await saveSession(sessionToSave);
+        setState(prev => {
+          if (prev.session?.token !== sessionToSave.token) return prev;
+          return { 
+            ...prev, 
+            isSyncing: false, 
+            session: sessionToSave 
+          };
+        });
       } catch (err) {
         console.error("Auto-save failed:", err);
         setState(prev => ({ ...prev, isSyncing: false }));
