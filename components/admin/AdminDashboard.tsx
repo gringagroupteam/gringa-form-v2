@@ -136,6 +136,19 @@ export default function AdminDashboard() {
           </button>
         </div>
 
+        {/* Connectivity Diagnostic */}
+        <div className="mb-8 p-3 bg-ink/5 border border-line flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${supabase.auth ? 'bg-green-500' : 'bg-red-500'}`} />
+            <span className="font-sans text-[11px] uppercase tracking-wider text-ink-soft">
+              Supabase Status: {process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('placeholder') ? '⚠️ Using Placeholder' : '✓ Connected'}
+            </span>
+          </div>
+          <span className="font-sans text-[10px] text-ink-muted italic">
+            URL: {process.env.NEXT_PUBLIC_SUPABASE_URL?.split('//')[1]?.substring(0, 15)}...
+          </span>
+        </div>
+
         {isLoading ? (
           <div className="py-24 text-center font-sans italic text-ink-muted">Loading briefings...</div>
         ) : sessions.length === 0 ? (

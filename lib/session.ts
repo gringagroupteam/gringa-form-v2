@@ -155,7 +155,7 @@ export async function saveSession(session: GringaSession): Promise<void> {
         }
       }
     } catch (err) {
-      console.warn("Supabase background sync failed:", err);
+      console.error("CRITICAL: Supabase background sync failed!", err);
     }
   })();
 }
