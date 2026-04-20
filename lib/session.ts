@@ -231,9 +231,6 @@ export async function loadSession(token: string): Promise<GringaSession | null> 
       }
       return session;
     }
-  } catch (err) {
-    console.warn("Supabase load error:", err);
-  }
 
   return localSession;
 }
