@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { GringaSession, Respondent } from "@/lib/session";
+import { GringaSession } from "@/lib/session";
 import { PageFrame } from "@/components/ui/PageFrame";
 
 export default function AdminDashboard() {
@@ -31,18 +31,18 @@ export default function AdminDashboard() {
       if (error) throw error;
 
       if (sessionData) {
-        setSessions(sessionData.map((s: any) => ({
+        setSessions(sessionData.map((s) => ({
           ...s,
           allIndividualComplete: s.all_individual_complete,
           togetherUnlocked: s.together_unlocked,
           togetherStarted: s.together_started,
           currentStepIndex: s.current_step_index,
-          respondents: s.respondents.map((r: any) => ({
+          respondents: (s.respondents as any[]).map((r) => ({
             ...r,
             individualComplete: r.individual_complete,
             individualCompletedAt: r.individual_completed_at,
           })),
-        })));
+        })) as (GringaSession & { id: string })[]);
       }
     } catch (err) {
       console.error("Fetch sessions error:", err);

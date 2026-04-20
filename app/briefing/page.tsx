@@ -85,7 +85,7 @@ function BriefingContent() {
       }
     }
     initBriefing();
-  }, [searchParams, state.gate, state.currentStepIndex, resumeSession, setRespondent, router]);
+  }, [searchParams, resumeSession, setRespondent, router]);
 
   const steps = useMemo(() => {
     if (!state.gate) return [];

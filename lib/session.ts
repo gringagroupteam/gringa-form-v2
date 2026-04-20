@@ -169,7 +169,7 @@ export async function loadSession(token: string): Promise<GringaSession | null> 
   if (isClient) {
     const localData = localStorage.getItem(`${STORAGE_PREFIX}session_${token}`);
     if (localData) {
-      try { localSession = JSON.parse(localData) as GringaSession; } catch (e) {}
+      try { localSession = JSON.parse(localData) as GringaSession; } catch { /* ignore */ }
     }
   }
 
