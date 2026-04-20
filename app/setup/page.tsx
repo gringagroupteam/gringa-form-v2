@@ -34,6 +34,7 @@ function SetupContent() {
       }
     }
     initSetup();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, state.session, resumeSession, router]);
 
   if (!state.session) return null;
