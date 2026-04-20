@@ -188,12 +188,12 @@ export async function loadSession(token: string): Promise<GringaSession | null> 
         .single();
 
       if (sData && !sError) {
-        sessionData = sData;
+        sessionData = sData as any;
         const { data: rData } = await supabase
           .from("respondents")
           .select("*")
-          .eq("session_id", sData.id);
-        respData = rData;
+          .eq("session_id", (sData as any).id);
+        respData = rData as any[];
         break;
       }
     } catch (err) {
@@ -204,27 +204,27 @@ export async function loadSession(token: string): Promise<GringaSession | null> 
   }
 
   if (sessionData) {
-
-      const session: GringaSession = {
-        token: sessionData.token,
-        email: sessionData.email,
-        gate: sessionData.gate,
-        currentStepIndex: sessionData.current_step_index,
-        answers: sessionData.answers,
-        createdAt: sessionData.created_at,
-        updatedAt: sessionData.updated_at,
-        completed: sessionData.completed,
-        allIndividualComplete: sessionData.all_individual_complete,
-        togetherUnlocked: sessionData.together_unlocked,
-        togetherStarted: sessionData.together_started,
-        respondents: (respData || []).map(r => ({
-          email: r.email,
-          name: r.name,
-          token: r.token,
-          individualComplete: r.individual_complete,
-          individualCompletedAt: r.individual_completed_at,
-        })),
-      };
+    const s = sessionData as any;
+    const session: GringaSession = {
+      token: s.token,
+      email: s.email,
+      gate: s.gate,
+      currentStepIndex: s.current_step_index,
+      answers: s.answers,
+      createdAt: s.created_at,
+      updatedAt: s.updated_at,
+      completed: s.completed,
+      allIndividualComplete: s.all_individual_complete,
+      togetherUnlocked: s.together_unlocked,
+      togetherStarted: s.together_started,
+      respondents: (respData || []).map((r: any) => ({
+        email: r.email,
+        name: r.name,
+        token: r.token,
+        individualComplete: r.individual_complete,
+        individualCompletedAt: r.individual_completed_at,
+      })),
+    };
 
       if (isClient) {
         localStorage.setItem(`${STORAGE_PREFIX}session_${token}`, JSON.stringify(session));
