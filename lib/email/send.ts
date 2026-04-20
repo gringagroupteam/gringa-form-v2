@@ -1,7 +1,5 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function sendMagicLink({
   to,
   name,
@@ -19,6 +17,7 @@ export async function sendMagicLink({
     together_ready: "You're up — complete your brand discovery form",
   };
 
+  const resend = new Resend(process.env.RESEND_API_KEY);
   const { data, error } = await resend.emails.send({
     from: 'Gringa Group <discovery@gringagroup.com>',
     to,
