@@ -1,0 +1,244 @@
+"use client";
+
+import { useEffect, useState, useMemo, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useFormContext } from "@/lib/state/FormContext";
+import { buildSteps, buildIndividualSteps, buildTogetherSteps, StepType } from "@/lib/steps";
+import { ScreenTransition } from "@/components/motion/ScreenTransition";
+import { ProgressBar } from "@/components/ui/ProgressBar";
+import { BlockHeaderScreen } from "@/components/screens/BlockHeaderScreen";
+import { QuestionScreen } from "@/components/screens/QuestionScreen";
+import { HandoffScreen } from "@/components/screens/HandoffScreen";
+import { MilestoneOverlay } from "@/components/screens/MilestoneOverlay";
+import { WaitingScreen } from "@/components/screens/WaitingScreen";
+import { TogetherReadyScreen } from "@/components/screens/TogetherReadyScreen";
+import { loadSession, getSessionByRespondentToken, markRespondentComplete } from "@/lib/session";
+import { sendEmail } from "@/lib/email/client";
+
+function BriefingContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { state, setAnswer, resumeSession, setCurrentStep, setRespondent } = useFormContext();
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [direction, setDirection] = useState<"forward" | "backward">("forward");
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [showStatusScreen, setShowStatusScreen] = useState<"waiting" | "ready" | null>(null);
+
+  // Handle URL token or session detection
+  useEffect(() => {
+    async function initBriefing() {
+      const token = searchParams.get("token");
+      const respondentToken = searchParams.get("respondent");
+
+      if (respondentToken) {
+        // Multi-person flow
+        const result = await getSessionByRespondentToken(respondentToken);
+        if (result) {
+          const { session, respondent } = result;
+          if (session.completed) {
+            router.push("/?completed=true");
+            return;
+          }
+          
+          resumeSession(session);
+          setRespondent(respondent);
+          
+          if (respondent.individualComplete && !session.togetherUnlocked) {
+            setShowStatusScreen("waiting");
+          } else if (session.togetherUnlocked && !session.togetherStarted) {
+            setShowStatusScreen("ready");
+          } else {
+            setCurrentStepIndex(session.currentStepIndex || 0);
+          }
+          setIsHydrated(true);
+        } else {
+          router.push("/");
+        }
+      } else if (token) {
+        // Solo flow or primary entry
+        const session = await loadSession(token);
+        if (session) {
+          if (session.completed) {
+            router.push("/?completed=true");
+            return;
+          }
+          resumeSession(session);
+          setCurrentStepIndex(session.currentStepIndex);
+          setIsHydrated(true);
+        } else {
+          router.push("/");
+        }
+      } else if (state.gate) {
+        // Direct navigation from previous screen
+        setCurrentStepIndex(state.currentStepIndex);
+        setIsHydrated(true);
+      } else {
+        const timer = setTimeout(() => {
+          if (!state.gate) {
+            router.push("/");
+          } else {
+            setCurrentStepIndex(state.currentStepIndex);
+            setIsHydrated(true);
+          }
+        }, 200);
+        return () => clearTimeout(timer);
+      }
+    }
+    initBriefing();
+  }, [searchParams, state.gate, state.currentStepIndex, resumeSession, setRespondent, router]);
+
+  const steps = useMemo(() => {
+    if (!state.gate) return [];
+    
+    // Logic for step generation
+    if (state.activeRespondent && !state.session?.togetherUnlocked) {
+      return buildIndividualSteps();
+    }
+    
+    if (state.session?.togetherUnlocked) {
+      return buildTogetherSteps();
+    }
+
+    return buildSteps();
+  }, [state.gate, state.activeRespondent, state.session?.togetherUnlocked]);
+
+  if (!isHydrated || !state.gate || steps.length === 0) {
+    return null;
+  }
+
+  const progress = currentStepIndex / (steps.length - 1);
+  const currentStep = steps[currentStepIndex];
+
+  const handleNext = async (value?: unknown) => {
+    if (currentStep.kind === "question" && value !== undefined) {
+      setAnswer(currentStep.question.id, value);
+    }
+
+    const nextIndex = currentStepIndex + 1;
+    
+    // Check if we finished individual individual steps
+    if (state.activeRespondent && !state.session?.togetherUnlocked && nextIndex >= steps.length) {
+      if (state.session && state.activeRespondent) {
+        await markRespondentComplete(state.session.token, state.activeRespondent.token);
+        
+        // Reload session to check if everyone is done
+        const updatedSession = await loadSession(state.session.token);
+        if (updatedSession?.allIndividualComplete) {
+          // Notify everyone!
+          const origin = window.location.origin;
+          updatedSession.respondents.forEach(r => {
+            sendEmail({
+              to: r.email,
+              link: `${origin}/briefing?token=${updatedSession.token}`,
+              type: 'together_ready'
+            }).catch(console.error);
+          });
+          setShowStatusScreen("ready");
+        } else {
+          setShowStatusScreen("waiting");
+        }
+      }
+      return;
+    }
+
+    if (nextIndex >= steps.length) {
+      router.push("/complete");
+    } else {
+      setDirection("forward");
+      setCurrentStepIndex(nextIndex);
+      setCurrentStep(nextIndex);
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStepIndex > 0) {
+      const prevIndex = currentStepIndex - 1;
+      setDirection("backward");
+      setCurrentStepIndex(prevIndex);
+      setCurrentStep(prevIndex);
+    } else {
+      router.push("/start");
+    }
+  };
+
+  const handleStartTogether = () => {
+    if (state.session) {
+      // Reset index for the together flow
+      setCurrentStepIndex(0);
+      setCurrentStep(0);
+      setShowStatusScreen(null);
+    }
+  };
+
+  if (showStatusScreen === "waiting") {
+    return (
+      <WaitingScreen 
+        respondents={state.session?.respondents || []} 
+        sessionToken={state.session?.token || ""} 
+        onTogetherReady={() => setShowStatusScreen("ready")}
+      />
+    );
+  }
+
+  if (showStatusScreen === "ready") {
+    return <TogetherReadyScreen onNext={handleStartTogether} />;
+  }
+
+  const renderStep = (step: StepType) => {
+    switch (step.kind) {
+      case "block_header":
+        return (
+          <BlockHeaderScreen
+            block={step.block}
+            blockNumber={step.block.id}
+            onNext={handleNext}
+          />
+        );
+      case "question":
+        return (
+          <QuestionScreen
+            question={step.question}
+            blockId={step.block.id}
+            questionIndex={step.questionIndex}
+            totalInBlock={step.totalInBlock}
+            onNext={handleNext}
+            onBack={handleBack}
+            existingAnswer={state.answers[step.question.id]}
+          />
+        );
+      case "handoff":
+        return <HandoffScreen onNext={handleNext} />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <>
+      <ProgressBar progress={progress} />
+      
+      <ScreenTransition 
+        direction={direction} 
+        stepKey={`step-${state.session?.togetherUnlocked ? 'together' : 'indiv'}-${currentStepIndex}`}
+      >
+        {currentStep.kind !== "milestone" ? (
+          renderStep(currentStep)
+        ) : (
+          <div className="w-full min-h-[60vh]" />
+        )}
+      </ScreenTransition>
+
+      {currentStep.kind === "milestone" && (
+        <MilestoneOverlay message={currentStep.message} onDone={handleNext} />
+      )}
+    </>
+  );
+}
+
+export default function BriefingPage() {
+  return (
+    <Suspense fallback={null}>
+      <BriefingContent />
+    </Suspense>
+  );
+}
