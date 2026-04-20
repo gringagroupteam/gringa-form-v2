@@ -5,6 +5,30 @@ import { supabase } from "@/lib/supabase";
 import { GringaSession } from "@/lib/session";
 import { PageFrame } from "@/components/ui/PageFrame";
 
+interface SupabaseRespondent {
+  email: string;
+  name: string | null;
+  token: string;
+  individual_complete: boolean;
+  individual_completed_at: string | null;
+}
+
+interface SupabaseSession {
+  id: string;
+  token: string;
+  email: string;
+  gate: string | null;
+  current_step_index: number;
+  answers: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  completed: boolean;
+  all_individual_complete: boolean;
+  together_unlocked: boolean;
+  together_started: boolean;
+  respondents: SupabaseRespondent[];
+}
+
 export default function AdminDashboard() {
   const [sessions, setSessions] = useState<(GringaSession & { id: string })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,18 +55,28 @@ export default function AdminDashboard() {
       if (error) throw error;
 
       if (sessionData) {
-        setSessions(sessionData.map((s) => ({
-          ...s,
+        const typedData = sessionData as unknown as SupabaseSession[];
+        setSessions(typedData.map((s) => ({
+          token: s.token,
+          id: s.id,
+          email: s.email,
+          gate: s.gate,
+          currentStepIndex: s.current_step_index,
+          answers: s.answers,
+          createdAt: s.created_at,
+          updatedAt: s.updated_at,
+          completed: s.completed,
           allIndividualComplete: s.all_individual_complete,
           togetherUnlocked: s.together_unlocked,
           togetherStarted: s.together_started,
-          currentStepIndex: s.current_step_index,
-          respondents: (s.respondents as any[]).map((r) => ({
-            ...r,
+          respondents: s.respondents.map((r) => ({
+            email: r.email,
+            name: r.name || undefined,
+            token: r.token,
             individualComplete: r.individual_complete,
-            individualCompletedAt: r.individual_completed_at,
+            individualCompletedAt: r.individual_completed_at || undefined,
           })),
-        })) as (GringaSession & { id: string })[]);
+        })));
       }
     } catch (err) {
       console.error("Fetch sessions error:", err);

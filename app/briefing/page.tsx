@@ -85,6 +85,7 @@ function BriefingContent() {
       }
     }
     initBriefing();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, resumeSession, setRespondent, router]);
 
   const steps = useMemo(() => {
