@@ -173,19 +173,37 @@ export async function loadSession(token: string): Promise<GringaSession | null> 
     }
   }
 
-  // 2. Try Supabase in parallel/background to refresh
-  try {
-    const { data: sessionData, error: sessionError } = await supabase
-      .from("sessions")
-      .select("*")
-      .eq("token", token)
-      .single();
+  // 2. Try Supabase in parallel/background to refresh (with simple retry)
+  let attempts = 0;
+  const maxAttempts = 3;
+  let sessionData = null;
+  let respData = null;
 
-    if (sessionData && !sessionError) {
-      const { data: respData } = await supabase
-        .from("respondents")
+  while (attempts < maxAttempts) {
+    try {
+      const { data: sData, error: sError } = await supabase
+        .from("sessions")
         .select("*")
-        .eq("session_id", sessionData.id);
+        .eq("token", token)
+        .single();
+
+      if (sData && !sError) {
+        sessionData = sData;
+        const { data: rData } = await supabase
+          .from("respondents")
+          .select("*")
+          .eq("session_id", sData.id);
+        respData = rData;
+        break;
+      }
+    } catch (err) {
+      console.warn(`Supabase load attempt ${attempts + 1} failed:`, err);
+    }
+    attempts++;
+    if (attempts < maxAttempts) await new Promise(r => setTimeout(r, 500 * attempts));
+  }
+
+  if (sessionData) {
 
       const session: GringaSession = {
         token: sessionData.token,
