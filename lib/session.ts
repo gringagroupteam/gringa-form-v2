@@ -27,6 +27,29 @@ export interface GringaSession {
   togetherStarted: boolean;          // true when someone clicked into Block 002
 }
 
+interface SupabaseSessionRow {
+  id: string;
+  token: string;
+  email: string;
+  gate: string | null;
+  current_step_index: number;
+  answers: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  completed: boolean;
+  all_individual_complete: boolean;
+  together_unlocked: boolean;
+  together_started: boolean;
+}
+
+interface SupabaseRespondentRow {
+  email: string;
+  name: string | null;
+  token: string;
+  individual_complete: boolean;
+  individual_completed_at: string | null;
+}
+
 const STORAGE_PREFIX = "gringa_";
 const ACTIVE_TOKEN_KEY = `${STORAGE_PREFIX}active_token`;
 
@@ -178,8 +201,8 @@ export async function loadSession(token: string): Promise<GringaSession | null> 
   }
 
   // 2. Refresh from Supabase with retries
-  let sessionData: any = null;
-  let respData: any[] = [];
+  let sessionData: SupabaseSessionRow | null = null;
+  let respData: SupabaseRespondentRow[] = [];
   let attempts = 0;
   const maxAttempts = 3;
 
@@ -192,12 +215,12 @@ export async function loadSession(token: string): Promise<GringaSession | null> 
         .single();
 
       if (sData && !sError) {
-        sessionData = sData;
+        sessionData = sData as unknown as SupabaseSessionRow;
         const { data: rData } = await supabase
           .from("respondents")
           .select("*")
-          .eq("session_id", sData.id);
-        respData = rData || [];
+          .eq("session_id", sessionData.id);
+        respData = (rData as unknown as SupabaseRespondentRow[]) || [];
         break;
       }
     } catch (err) {
@@ -224,12 +247,12 @@ export async function loadSession(token: string): Promise<GringaSession | null> 
       allIndividualComplete: s.all_individual_complete,
       togetherUnlocked: s.together_unlocked,
       togetherStarted: s.together_started,
-      respondents: respData.map((r: any) => ({
+      respondents: respData.map((r: SupabaseRespondentRow) => ({
         email: r.email,
-        name: r.name,
+        name: r.name || undefined,
         token: r.token,
         individualComplete: r.individual_complete,
-        individualCompletedAt: r.individual_completed_at,
+        individualCompletedAt: r.individual_completed_at || undefined,
       })),
     };
 
