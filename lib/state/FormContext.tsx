@@ -13,8 +13,6 @@ interface FormState {
   isSyncing: boolean; // Tracking DB sync status
 }
 
-}
-
 interface FormActions {
   initSession: (email: string) => Promise<void>;
   resumeSession: (session: GringaSession) => void;
@@ -122,7 +120,8 @@ export function FormProvider({ children }: { children: ReactNode }) {
       session,
       email: session.email,
       gate: session.gate,
-      currentStepIndex: session.currentStepIndex,
+      // Priority to local currentStepIndex if already active to prevent "jumps"
+      currentStepIndex: prev.session ? prev.currentStepIndex : session.currentStepIndex,
       answers: session.answers,
     }));
   }, []);

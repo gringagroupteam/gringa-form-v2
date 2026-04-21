@@ -61,9 +61,6 @@ export const QuestionScreen = React.memo(({
 
   const handleSingleSelect = (val: string) => {
     setValue(val);
-    setTimeout(() => {
-      onNext(val);
-    }, 250);
   };
 
   const renderInput = () => {
@@ -133,11 +130,9 @@ export const QuestionScreen = React.memo(({
           {renderInput()}
         </div>
 
-        {question.type !== "single_select" && (
-          <div className="flex justify-start h-10">
-            <NextButton label="Continue →" onClick={handleNext} show={isValid} />
-          </div>
-        )}
+        <div className="flex justify-start h-10">
+          <NextButton label="Continue →" onClick={handleNext} show={isValid} />
+        </div>
 
       </div>
       
