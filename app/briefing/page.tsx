@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useMemo, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useFormState, useFormActions } from "@/lib/state/FormContext";
 import { buildSteps, buildIndividualSteps, buildTogetherSteps, StepType } from "@/lib/steps";
 import { ScreenTransition } from "@/components/motion/ScreenTransition";
@@ -16,15 +16,104 @@ import { loadSession, getSessionByRespondentToken, markRespondentComplete, saveS
 import { sendEmail } from "@/lib/email/client";
 import React from "react";
 
-function BriefingContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const state = useFormState();
   const { setAnswer, resumeSession, setCurrentStep, setRespondent } = useFormActions();
   const [direction, setDirection] = useState<"forward" | "backward">("forward");
   const [isHydrated, setIsHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showStatusScreen, setShowStatusScreen] = useState<"waiting" | "ready" | null>(null);
+
+  const steps = React.useMemo(() => {
+    if (!state.gate) return [];
+    
+    // Logic for step generation
+    if (state.activeRespondent && !state.session?.togetherUnlocked) {
+      return buildIndividualSteps();
+    }
+    
+    if (state.session?.togetherUnlocked) {
+      return buildTogetherSteps();
+    }
+
+    return buildSteps();
+  }, [state.gate, state.activeRespondent, state.session?.togetherUnlocked]);
+
+  const currentStepIndex = state.currentStepIndex;
+  const progress = currentStepIndex / (steps.length - 1);
+  const currentStep = steps[currentStepIndex];
+
+  const handleNext = React.useCallback(async (value?: unknown) => {
+    let updatedAnswers = state.answers;
+    if (currentStep && currentStep.kind === "question" && value !== undefined) {
+      setAnswer(currentStep.question.id, value);
+      updatedAnswers = { ...state.answers, [currentStep.question.id]: value };
+    }
+
+    const nextIndex = currentStepIndex + 1;
+
+    // PERSISTENCE CHECKPOINT
+    // Instead of auto-syncing in the background, we save reliably on "Next"
+    if (state.session) {
+      const sessionToSave: GringaSession = {
+        ...state.session,
+        answers: updatedAnswers,
+        currentStepIndex: nextIndex < steps.length ? nextIndex : currentStepIndex,
+        gate: state.gate,
+      };
+      
+      // Save in background to keep UI moving, or await for total safety
+      saveSession(sessionToSave).catch(err => console.error("Checkpoint save failed:", err));
+    }
+    
+    // Check if we finished individual individual steps
+    if (state.activeRespondent && !state.session?.togetherUnlocked && nextIndex >= steps.length) {
+      if (state.session && state.activeRespondent) {
+        await markRespondentComplete(state.session.token, state.activeRespondent.token);
+        
+        // Reload session to check if everyone is done
+        const updatedSession = await loadSession(state.session.token);
+        if (updatedSession?.allIndividualComplete) {
+          // Notify everyone!
+          const origin = window.location.origin;
+          updatedSession.respondents.forEach(r => {
+            sendEmail({
+              to: r.email,
+              link: `${origin}/briefing?token=${updatedSession.token}`,
+              type: 'together_ready'
+            }).catch(console.error);
+          });
+          setShowStatusScreen("ready");
+        } else {
+          setShowStatusScreen("waiting");
+        }
+      }
+      return;
+    }
+
+    if (nextIndex >= steps.length) {
+      router.push("/complete");
+    } else {
+      setDirection("forward");
+      setCurrentStep(nextIndex);
+    }
+  }, [currentStep, currentStepIndex, steps.length, setAnswer, state.activeRespondent, state.session, setCurrentStep, router, state.gate]);
+
+  const handleBack = React.useCallback(() => {
+    if (currentStepIndex > 0) {
+      const prevIndex = currentStepIndex - 1;
+      setDirection("backward");
+      setCurrentStep(prevIndex);
+    } else {
+      router.push("/start");
+    }
+  }, [currentStepIndex, setCurrentStep, router]);
+
+  const handleStartTogether = React.useCallback(() => {
+    if (state.session) {
+      setCurrentStep(0);
+      setShowStatusScreen(null);
+    }
+  }, [state.session, setCurrentStep]);
 
   // Handle URL token or session detection
   useEffect(() => {
@@ -93,21 +182,6 @@ function BriefingContent() {
     initBriefing();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, resumeSession, setRespondent, router, setCurrentStep]);
-
-  const steps = React.useMemo(() => {
-    if (!state.gate) return [];
-    
-    // Logic for step generation
-    if (state.activeRespondent && !state.session?.togetherUnlocked) {
-      return buildIndividualSteps();
-    }
-    
-    if (state.session?.togetherUnlocked) {
-      return buildTogetherSteps();
-    }
-
-    return buildSteps();
-  }, [state.gate, state.activeRespondent, state.session?.togetherUnlocked]);
 
   if (error) {
     return (

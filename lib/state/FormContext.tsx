@@ -1,7 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from "react";
-import { GringaSession, createSession, saveSession, getActiveSession, markCompleted, clearActiveSession, Respondent } from "@/lib/session";
+import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { GringaSession, createSession, getActiveSession, markCompleted, clearActiveSession, Respondent } from "@/lib/session";
 
 interface FormState {
   session: GringaSession | null;
