@@ -191,7 +191,7 @@ function BriefingContent() {
       setDirection("forward");
       setCurrentStep(nextIndex);
     }
-  }, [currentStep, currentStepIndex, steps.length, setAnswer, state.activeRespondent, state.session, markRespondentComplete, loadSession, sendEmail, setShowStatusScreen, router, setCurrentStep]);
+  }, [currentStep, currentStepIndex, steps.length, setAnswer, state.activeRespondent, state.session, setCurrentStep, router, state.gate]);
 
   const handleBack = React.useCallback(() => {
     if (currentStepIndex > 0) {
@@ -208,7 +208,7 @@ function BriefingContent() {
       setCurrentStep(0);
       setShowStatusScreen(null);
     }
-  }, [state.session, setCurrentStep, setShowStatusScreen]);
+  }, [state.session, setCurrentStep]);
 
   if (showStatusScreen === "waiting") {
     return (
