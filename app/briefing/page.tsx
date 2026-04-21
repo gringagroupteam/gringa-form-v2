@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useFormContext } from "@/lib/state/FormContext";
+import { useFormState, useFormActions } from "@/lib/state/FormContext";
 import { buildSteps, buildIndividualSteps, buildTogetherSteps, StepType } from "@/lib/steps";
 import { ScreenTransition } from "@/components/motion/ScreenTransition";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -14,11 +12,13 @@ import { WaitingScreen } from "@/components/screens/WaitingScreen";
 import { TogetherReadyScreen } from "@/components/screens/TogetherReadyScreen";
 import { loadSession, getSessionByRespondentToken, markRespondentComplete } from "@/lib/session";
 import { sendEmail } from "@/lib/email/client";
+import React from "react";
 
 function BriefingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { state, setAnswer, resumeSession, setCurrentStep, setRespondent } = useFormContext();
+  const state = useFormState();
+  const { setAnswer, resumeSession, setCurrentStep, setRespondent } = useFormActions();
   const [direction, setDirection] = useState<"forward" | "backward">("forward");
   const [isHydrated, setIsHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +92,7 @@ function BriefingContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, resumeSession, setRespondent, router, setCurrentStep]);
 
-  const steps = useMemo(() => {
+  const steps = React.useMemo(() => {
     if (!state.gate) return [];
     
     // Logic for step generation
@@ -135,8 +135,8 @@ function BriefingContent() {
   const progress = currentStepIndex / (steps.length - 1);
   const currentStep = steps[currentStepIndex];
 
-  const handleNext = async (value?: unknown) => {
-    if (currentStep.kind === "question" && value !== undefined) {
+  const handleNext = React.useCallback(async (value?: unknown) => {
+    if (currentStep && currentStep.kind === "question" && value !== undefined) {
       setAnswer(currentStep.question.id, value);
     }
 
@@ -173,9 +173,9 @@ function BriefingContent() {
       setDirection("forward");
       setCurrentStep(nextIndex);
     }
-  };
+  }, [currentStep, currentStepIndex, steps.length, setAnswer, state.activeRespondent, state.session, markRespondentComplete, loadSession, sendEmail, setShowStatusScreen, router, setCurrentStep]);
 
-  const handleBack = () => {
+  const handleBack = React.useCallback(() => {
     if (currentStepIndex > 0) {
       const prevIndex = currentStepIndex - 1;
       setDirection("backward");
@@ -183,14 +183,14 @@ function BriefingContent() {
     } else {
       router.push("/start");
     }
-  };
+  }, [currentStepIndex, setCurrentStep, router]);
 
-  const handleStartTogether = () => {
+  const handleStartTogether = React.useCallback(() => {
     if (state.session) {
       setCurrentStep(0);
       setShowStatusScreen(null);
     }
-  };
+  }, [state.session, setCurrentStep, setShowStatusScreen]);
 
   if (showStatusScreen === "waiting") {
     return (

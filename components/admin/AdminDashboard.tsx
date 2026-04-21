@@ -137,16 +137,48 @@ export default function AdminDashboard() {
         </div>
 
         {/* Connectivity Diagnostic */}
-        <div className="mb-8 p-3 bg-ink/5 border border-line flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${supabase.auth ? 'bg-green-500' : 'bg-red-500'}`} />
-            <span className="font-sans text-[11px] uppercase tracking-wider text-ink-soft">
-              Supabase Status: {process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('placeholder') ? '⚠️ Using Placeholder' : '✓ Connected'}
+        <div className="mb-8 p-4 bg-ink/5 border border-line flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${(!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) ? 'bg-red-500' : 'bg-green-500'}`} />
+              <span className="font-sans text-[11px] uppercase tracking-wider text-ink-soft font-bold">
+                {!process.env.NEXT_PUBLIC_SUPABASE_URL ? '❌ Missing URL' : process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder') ? '⚠️ Using Placeholder' : '✓ Connected'}
+              </span>
+            </div>
+            <span className="font-sans text-[10px] text-ink-muted italic">
+              Supabase URL: {process.env.NEXT_PUBLIC_SUPABASE_URL?.split('//')[1]?.substring(0, 20)}...
             </span>
           </div>
-          <span className="font-sans text-[10px] text-ink-muted italic">
-            URL: {process.env.NEXT_PUBLIC_SUPABASE_URL?.split('//')[1]?.substring(0, 15)}...
-          </span>
+
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={async () => {
+                const email = prompt("Enter email for diagnostic test:");
+                if (!email) return;
+                try {
+                  const res = await fetch('/api/send-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                      to: email, 
+                      link: window.location.origin, 
+                      type: 'test_diagnostic' 
+                    }),
+                  });
+                  if (res.ok) alert("Diagnostic email sent! Check your inbox/spam.");
+                  else {
+                    const err = await res.json();
+                    alert("Error sending email: " + (err.error || 'Unknown error'));
+                  }
+                } catch (e) {
+                  alert("Failed to call API: " + e);
+                }
+              }}
+              className="px-4 py-2 bg-ink text-bg font-sans text-[11px] uppercase tracking-tighter hover:bg-ink-soft transition-colors"
+            >
+              Send Test Email
+            </button>
+          </div>
         </div>
 
         {isLoading ? (

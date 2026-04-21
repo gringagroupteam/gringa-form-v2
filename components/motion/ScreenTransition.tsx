@@ -32,6 +32,7 @@ export function ScreenTransition({ children, direction = "forward", stepKey }: S
           y: isForward ? -6 : 6,
           transition: { duration: 0.28, ease: EASE_EXIT },
         }}
+        style={{ willChange: "transform, opacity" }}
         className="w-full min-h-screen flex flex-col items-center justify-center relative"
       >
         {children}

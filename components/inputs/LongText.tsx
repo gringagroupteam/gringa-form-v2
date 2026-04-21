@@ -16,10 +16,18 @@ export function LongText({ value, onChange, placeholder, maxChars }: LongTextPro
   const resizeTextarea = () => {
     const el = textareaRef.current;
     if (el) {
-      el.style.height = "80px"; // Reset to min-height to compute true scrollHeight
-      const newHeight = Math.max(80, Math.min(el.scrollHeight, 240));
-      el.style.height = `${newHeight}px`;
-      el.style.overflowY = el.scrollHeight > 240 ? "auto" : "hidden";
+      // Use requestAnimationFrame to avoid blocking the main thread
+      requestAnimationFrame(() => {
+        el.style.height = "80px"; 
+        const newHeight = Math.max(80, Math.min(el.scrollHeight, 240));
+        
+        // Only trigger DOM update if height actually changed
+        const currentHeight = parseInt(el.style.height);
+        if (currentHeight !== newHeight) {
+          el.style.height = `${newHeight}px`;
+          el.style.overflowY = el.scrollHeight > 240 ? "auto" : "hidden";
+        }
+      });
     }
   };
 

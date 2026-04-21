@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { Question } from "@/lib/form-template";
 import { PageFrame } from "@/components/ui/PageFrame";
 import { NextButton } from "@/components/ui/NextButton";
@@ -9,7 +9,7 @@ import { LongText } from "@/components/inputs/LongText";
 import { SingleSelect } from "@/components/inputs/SingleSelect";
 import { MultiSelect } from "@/components/inputs/MultiSelect";
 import { ContinueLaterModal } from "@/components/ui/ContinueLaterModal";
-import { useFormContext } from "@/lib/state/FormContext";
+import { useFormState, useFormActions } from "@/lib/state/FormContext";
 
 interface QuestionScreenProps {
   question: Question;
@@ -21,7 +21,7 @@ interface QuestionScreenProps {
   existingAnswer?: unknown;
 }
 
-export function QuestionScreen({
+export const QuestionScreen = React.memo(({
   question,
   blockId,
   questionIndex,
@@ -29,11 +29,11 @@ export function QuestionScreen({
   onNext,
   onBack,
   existingAnswer,
-}: QuestionScreenProps) {
-  const { state } = useFormContext();
-  const [isModalOpen, setIsModalOpen] = useState(false);
+}: QuestionScreenProps) => {
+  const state = useFormState();
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
   
-  const [value, setValue] = useState<unknown>(() => {
+  const [value, setValue] = React.useState<unknown>(() => {
     if (existingAnswer !== undefined && existingAnswer !== null) return existingAnswer;
     if (question.type === "multi_select") return [];
     if (question.type === "single_select") return null;
@@ -164,4 +164,6 @@ export function QuestionScreen({
       />
     </>
   );
-}
+});
+
+QuestionScreen.displayName = "QuestionScreen";

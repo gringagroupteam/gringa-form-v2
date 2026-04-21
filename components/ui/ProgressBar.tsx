@@ -1,12 +1,11 @@
-"use client";
-
+import React from "react";
 import { motion } from "framer-motion";
 
 interface ProgressBarProps {
   progress: number;
 }
 
-export function ProgressBar({ progress }: ProgressBarProps) {
+export const ProgressBar = React.memo(({ progress }: ProgressBarProps) => {
   return (
     <div className="fixed top-0 left-0 right-0 h-[2px] bg-line z-50 overflow-hidden">
       <motion.div
@@ -17,4 +16,6 @@ export function ProgressBar({ progress }: ProgressBarProps) {
       />
     </div>
   );
-}
+});
+
+ProgressBar.displayName = "ProgressBar";

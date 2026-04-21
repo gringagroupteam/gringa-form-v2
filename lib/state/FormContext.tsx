@@ -13,8 +13,9 @@ interface FormState {
   isSyncing: boolean; // Tracking DB sync status
 }
 
-interface FormContextType {
-  state: FormState;
+}
+
+interface FormActions {
   initSession: (email: string) => Promise<void>;
   resumeSession: (session: GringaSession) => void;
   setRespondent: (respondent: Respondent) => void;
@@ -35,7 +36,8 @@ const defaultState: FormState = {
   isSyncing: false,
 };
 
-const FormContext = createContext<FormContextType | undefined>(undefined);
+const FormStateContext = createContext<FormState | undefined>(undefined);
+const FormActionsContext = createContext<FormActions | undefined>(undefined);
 
 export function FormProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<FormState>(defaultState);
@@ -101,7 +103,7 @@ export function FormProvider({ children }: { children: ReactNode }) {
     };
   }, [state.answers, state.currentStepIndex, state.gate, state.session]);
 
-  const initSession = async (email: string) => {
+  const initSession = React.useCallback(async (email: string) => {
     const session = await createSession(email);
     setState({
       session,
@@ -112,9 +114,9 @@ export function FormProvider({ children }: { children: ReactNode }) {
       answers: session.answers,
       isSyncing: false,
     });
-  };
+  }, []);
 
-  const resumeSession = (session: GringaSession) => {
+  const resumeSession = React.useCallback((session: GringaSession) => {
     setState((prev) => ({
       ...prev,
       session,
@@ -123,18 +125,17 @@ export function FormProvider({ children }: { children: ReactNode }) {
       currentStepIndex: session.currentStepIndex,
       answers: session.answers,
     }));
-    // Note: session.token is already handled by lib/session internal persistence
-  };
+  }, []);
 
-  const setRespondent = (respondent: Respondent) => {
+  const setRespondent = React.useCallback((respondent: Respondent) => {
     setState((prev) => ({ ...prev, activeRespondent: respondent }));
-  };
+  }, []);
 
-  const setGate = (gate: string) => {
+  const setGate = React.useCallback((gate: string) => {
     setState((prev) => ({ ...prev, gate }));
-  };
+  }, []);
 
-  const setAnswer = (questionId: string, value: unknown) => {
+  const setAnswer = React.useCallback((questionId: string, value: unknown) => {
     setState((prev) => ({
       ...prev,
       answers: {
@@ -142,46 +143,76 @@ export function FormProvider({ children }: { children: ReactNode }) {
         [questionId]: value,
       }
     }));
-  };
+  }, []);
 
-  const setCurrentStep = (index: number) => {
+  const setCurrentStep = React.useCallback((index: number) => {
     setState((prev) => ({ ...prev, currentStepIndex: index }));
-  };
+  }, []);
 
-  const completeForm = async () => {
-    if (state.session) {
-      await markCompleted(state.session.token);
-      clearActiveSession();
-      setState(defaultState);
-    }
-  };
-
-  const startOver = () => {
+  const completeForm = React.useCallback(async () => {
+    setState(prev => {
+      if (prev.session) {
+        markCompleted(prev.session.token);
+      }
+      return prev;
+    });
     clearActiveSession();
     setState(defaultState);
-  };
+  }, []);
+
+  const startOver = React.useCallback(() => {
+    clearActiveSession();
+    setState(defaultState);
+  }, []);
+
+  const actions = React.useMemo(() => ({
+    initSession,
+    resumeSession,
+    setRespondent,
+    setGate,
+    setAnswer,
+    setCurrentStep,
+    completeForm,
+    startOver
+  }), [
+    initSession,
+    resumeSession,
+    setRespondent,
+    setGate,
+    setAnswer,
+    setCurrentStep,
+    completeForm,
+    startOver
+  ]);
 
   return (
-    <FormContext.Provider value={{ 
-      state, 
-      initSession, 
-      resumeSession, 
-      setRespondent,
-      setGate, 
-      setAnswer, 
-      setCurrentStep, 
-      completeForm,
-      startOver
-    }}>
-      {children}
-    </FormContext.Provider>
+    <FormStateContext.Provider value={state}>
+      <FormActionsContext.Provider value={actions}>
+        {children}
+      </FormActionsContext.Provider>
+    </FormStateContext.Provider>
   );
 }
 
-export function useFormContext() {
-  const context = useContext(FormContext);
+export function useFormState() {
+  const context = useContext(FormStateContext);
   if (context === undefined) {
-    throw new Error("useFormContext must be used within a FormProvider");
+    throw new Error("useFormState must be used within a FormProvider");
   }
   return context;
+}
+
+export function useFormActions() {
+  const context = useContext(FormActionsContext);
+  if (context === undefined) {
+    throw new Error("useFormActions must be used within a FormProvider");
+  }
+  return context;
+}
+
+// For backward compatibility only - avoid using for new performance-tuned code
+export function useFormContext() {
+  const state = useFormState();
+  const actions = useFormActions();
+  return { state, ...actions };
 }
