@@ -39,8 +39,6 @@ const FormActionsContext = createContext<FormActions | undefined>(undefined);
 
 export function FormProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<FormState>(defaultState);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
   // Hydrate on mount
   useEffect(() => {
     async function hydrate() {
@@ -52,54 +50,6 @@ export function FormProvider({ children }: { children: ReactNode }) {
     hydrate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // AUTO-SAVE EFFECT
-  // Syncs local state changes to Supabase with debouncing
-  useEffect(() => {
-    if (!state.session || state.session.completed) return;
-
-    // Check if anything actually changed relative to session source
-    const hasChanged = 
-      state.answers !== state.session.answers ||
-      state.currentStepIndex !== state.session.currentStepIndex ||
-      state.gate !== state.session.gate;
-
-    if (!hasChanged) return;
-
-    // Debounce saves to 1 second
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-
-    saveTimeoutRef.current = setTimeout(async () => {
-      // Don't mark isSyncing if we've already unmounted or session changed
-      setState(prev => prev.session?.token === state.session?.token ? { ...prev, isSyncing: true } : prev);
-      
-      const sessionToSave: GringaSession = {
-        ...state.session!,
-        answers: state.answers,
-        currentStepIndex: state.currentStepIndex,
-        gate: state.gate,
-      };
-
-      try {
-        await saveSession(sessionToSave);
-        setState(prev => {
-          if (prev.session?.token !== sessionToSave.token) return prev;
-          return { 
-            ...prev, 
-            isSyncing: false, 
-            session: sessionToSave 
-          };
-        });
-      } catch (err) {
-        console.error("Auto-save failed:", err);
-        setState(prev => ({ ...prev, isSyncing: false }));
-      }
-    }, 1000);
-
-    return () => {
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    };
-  }, [state.answers, state.currentStepIndex, state.gate, state.session]);
 
   const initSession = React.useCallback(async (email: string) => {
     const session = await createSession(email);

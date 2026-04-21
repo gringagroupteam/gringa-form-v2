@@ -1,5 +1,7 @@
 "use client";
 
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, useMemo, Suspense } from "react";
 import { useFormState, useFormActions } from "@/lib/state/FormContext";
 import { buildSteps, buildIndividualSteps, buildTogetherSteps, StepType } from "@/lib/steps";
 import { ScreenTransition } from "@/components/motion/ScreenTransition";
@@ -10,7 +12,7 @@ import { HandoffScreen } from "@/components/screens/HandoffScreen";
 import { MilestoneOverlay } from "@/components/screens/MilestoneOverlay";
 import { WaitingScreen } from "@/components/screens/WaitingScreen";
 import { TogetherReadyScreen } from "@/components/screens/TogetherReadyScreen";
-import { loadSession, getSessionByRespondentToken, markRespondentComplete } from "@/lib/session";
+import { loadSession, getSessionByRespondentToken, markRespondentComplete, saveSession, GringaSession } from "@/lib/session";
 import { sendEmail } from "@/lib/email/client";
 import React from "react";
 
@@ -136,11 +138,27 @@ function BriefingContent() {
   const currentStep = steps[currentStepIndex];
 
   const handleNext = React.useCallback(async (value?: unknown) => {
+    let updatedAnswers = state.answers;
     if (currentStep && currentStep.kind === "question" && value !== undefined) {
       setAnswer(currentStep.question.id, value);
+      updatedAnswers = { ...state.answers, [currentStep.question.id]: value };
     }
 
     const nextIndex = currentStepIndex + 1;
+
+    // PERSISTENCE CHECKPOINT
+    // Instead of auto-syncing in the background, we save reliably on "Next"
+    if (state.session) {
+      const sessionToSave: GringaSession = {
+        ...state.session,
+        answers: updatedAnswers,
+        currentStepIndex: nextIndex < steps.length ? nextIndex : currentStepIndex,
+        gate: state.gate,
+      };
+      
+      // Save in background to keep UI moving, or await for total safety
+      saveSession(sessionToSave).catch(err => console.error("Checkpoint save failed:", err));
+    }
     
     // Check if we finished individual individual steps
     if (state.activeRespondent && !state.session?.togetherUnlocked && nextIndex >= steps.length) {
