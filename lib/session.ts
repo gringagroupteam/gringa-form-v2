@@ -164,20 +164,24 @@ export async function saveSession(session: GringaSession): Promise<void> {
  * Loads a session by token, preferential to Supabase with localStorage fallback.
  */
 export async function loadSession(token: string): Promise<GringaSession | null> {
-  // 1. First, check local storage for instant response
+  // 1. Check local storage first
   let localSession: GringaSession | null = null;
   if (isClient) {
     const localData = localStorage.getItem(`${STORAGE_PREFIX}session_${token}`);
     if (localData) {
-      try { localSession = JSON.parse(localData) as GringaSession; } catch { /* ignore */ }
+      try {
+        localSession = JSON.parse(localData) as GringaSession;
+      } catch (e) {
+        console.warn("Local storage parse error", e);
+      }
     }
   }
 
-  // 2. Try Supabase in parallel/background to refresh (with simple retry)
+  // 2. Refresh from Supabase with retries
+  let sessionData: any = null;
+  let respData: any[] = [];
   let attempts = 0;
   const maxAttempts = 3;
-  let sessionData = null;
-  let respData = null;
 
   while (attempts < maxAttempts) {
     try {
@@ -188,23 +192,26 @@ export async function loadSession(token: string): Promise<GringaSession | null> 
         .single();
 
       if (sData && !sError) {
-        sessionData = sData as any;
+        sessionData = sData;
         const { data: rData } = await supabase
           .from("respondents")
           .select("*")
-          .eq("session_id", (sData as any).id);
-        respData = rData as any[];
+          .eq("session_id", sData.id);
+        respData = rData || [];
         break;
       }
     } catch (err) {
-      console.warn(`Supabase load attempt ${attempts + 1} failed:`, err);
+      console.warn(`Supabase load attempt ${attempts + 1} failed`, err);
     }
+    
     attempts++;
-    if (attempts < maxAttempts) await new Promise(r => setTimeout(r, 500 * attempts));
+    if (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 500 * attempts));
+    }
   }
 
   if (sessionData) {
-    const s = sessionData as any;
+    const s = sessionData;
     const session: GringaSession = {
       token: s.token,
       email: s.email,
@@ -217,7 +224,7 @@ export async function loadSession(token: string): Promise<GringaSession | null> 
       allIndividualComplete: s.all_individual_complete,
       togetherUnlocked: s.together_unlocked,
       togetherStarted: s.together_started,
-      respondents: (respData || []).map((r: any) => ({
+      respondents: respData.map((r: any) => ({
         email: r.email,
         name: r.name,
         token: r.token,
@@ -226,11 +233,11 @@ export async function loadSession(token: string): Promise<GringaSession | null> 
       })),
     };
 
-      if (isClient) {
-        localStorage.setItem(`${STORAGE_PREFIX}session_${token}`, JSON.stringify(session));
-      }
-      return session;
+    if (isClient) {
+      localStorage.setItem(`${STORAGE_PREFIX}session_${token}`, JSON.stringify(session));
     }
+    return session;
+  }
 
   return localSession;
 }
