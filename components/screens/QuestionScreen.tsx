@@ -108,7 +108,7 @@ export const QuestionScreen = React.memo(({
   return (
     <>
       <PageFrame number={blockId} />
-      <div className="w-full max-w-[640px] mx-auto px-6 py-24 flex flex-col justify-center min-h-[70vh] relative">
+      <div className="w-full max-w-[640px] mx-auto px-6 py-12 flex flex-col justify-center min-h-[60vh] relative">
         
         <span className="font-sans font-medium text-[11px] tracking-[0.08em] uppercase text-ink-muted mb-8">
           {String(questionIndex + 1).padStart(2, '0')} / {String(totalInBlock).padStart(2, '0')}
@@ -126,30 +126,31 @@ export const QuestionScreen = React.memo(({
         
         {!question.helper && <div className="h-8" /> }
         
-        <div className="w-full mb-12">
+        <div className="w-full">
           {renderInput()}
         </div>
-
-        <div className="flex justify-start h-10">
-          <NextButton label="Continue →" onClick={handleNext} show={isValid} />
-        </div>
-
       </div>
       
       {/* Navigation Footer */}
-      <div className="fixed bottom-8 left-6 flex flex-col gap-3 z-40">
-        <button 
-          onClick={onBack}
-          className="font-sans text-[13px] text-ink-muted hover:text-ink text-left transition-colors duration-150"
-        >
-          ← Back
-        </button>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="font-sans text-[11px] text-ink-muted hover:underline text-left"
-        >
-          Continue later
-        </button>
+      <div className="fixed bottom-0 left-0 w-full px-6 py-8 flex justify-between items-end z-40 bg-gradient-to-t from-bg via-bg/80 to-transparent">
+        <div className="flex flex-col gap-3">
+          <button 
+            onClick={onBack}
+            className="font-sans text-[13px] text-ink-muted hover:text-ink text-left transition-colors duration-150"
+          >
+            ← Back
+          </button>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="font-sans text-[11px] text-ink-muted hover:underline text-left opacity-60 hover:opacity-100 transition-opacity"
+          >
+            Continue later
+          </button>
+        </div>
+
+        <div className="h-10 flex items-center">
+          <NextButton label="Continue →" onClick={handleNext} show={isValid} />
+        </div>
       </div>
 
       <ContinueLaterModal 
