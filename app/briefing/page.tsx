@@ -16,6 +16,9 @@ import { loadSession, getSessionByRespondentToken, markRespondentComplete, saveS
 import { sendEmail } from "@/lib/email/client";
 import React from "react";
 
+function BriefingContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const state = useFormState();
   const { setAnswer, resumeSession, setCurrentStep, setRespondent } = useFormActions();
   const [direction, setDirection] = useState<"forward" | "backward">("forward");
@@ -206,83 +209,6 @@ import React from "react";
       </div>
     );
   }
-
-  const currentStepIndex = state.currentStepIndex;
-  const progress = currentStepIndex / (steps.length - 1);
-  const currentStep = steps[currentStepIndex];
-
-  const handleNext = React.useCallback(async (value?: unknown) => {
-    let updatedAnswers = state.answers;
-    if (currentStep && currentStep.kind === "question" && value !== undefined) {
-      setAnswer(currentStep.question.id, value);
-      updatedAnswers = { ...state.answers, [currentStep.question.id]: value };
-    }
-
-    const nextIndex = currentStepIndex + 1;
-
-    // PERSISTENCE CHECKPOINT
-    // Instead of auto-syncing in the background, we save reliably on "Next"
-    if (state.session) {
-      const sessionToSave: GringaSession = {
-        ...state.session,
-        answers: updatedAnswers,
-        currentStepIndex: nextIndex < steps.length ? nextIndex : currentStepIndex,
-        gate: state.gate,
-      };
-      
-      // Save in background to keep UI moving, or await for total safety
-      saveSession(sessionToSave).catch(err => console.error("Checkpoint save failed:", err));
-    }
-    
-    // Check if we finished individual individual steps
-    if (state.activeRespondent && !state.session?.togetherUnlocked && nextIndex >= steps.length) {
-      if (state.session && state.activeRespondent) {
-        await markRespondentComplete(state.session.token, state.activeRespondent.token);
-        
-        // Reload session to check if everyone is done
-        const updatedSession = await loadSession(state.session.token);
-        if (updatedSession?.allIndividualComplete) {
-          // Notify everyone!
-          const origin = window.location.origin;
-          updatedSession.respondents.forEach(r => {
-            sendEmail({
-              to: r.email,
-              link: `${origin}/briefing?token=${updatedSession.token}`,
-              type: 'together_ready'
-            }).catch(console.error);
-          });
-          setShowStatusScreen("ready");
-        } else {
-          setShowStatusScreen("waiting");
-        }
-      }
-      return;
-    }
-
-    if (nextIndex >= steps.length) {
-      router.push("/complete");
-    } else {
-      setDirection("forward");
-      setCurrentStep(nextIndex);
-    }
-  }, [currentStep, currentStepIndex, steps.length, setAnswer, state.activeRespondent, state.session, setCurrentStep, router, state.gate]);
-
-  const handleBack = React.useCallback(() => {
-    if (currentStepIndex > 0) {
-      const prevIndex = currentStepIndex - 1;
-      setDirection("backward");
-      setCurrentStep(prevIndex);
-    } else {
-      router.push("/start");
-    }
-  }, [currentStepIndex, setCurrentStep, router]);
-
-  const handleStartTogether = React.useCallback(() => {
-    if (state.session) {
-      setCurrentStep(0);
-      setShowStatusScreen(null);
-    }
-  }, [state.session, setCurrentStep]);
 
   if (showStatusScreen === "waiting") {
     return (
